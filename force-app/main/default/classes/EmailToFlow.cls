@@ -33,7 +33,7 @@ global class EmailToFlow implements Messaging.inboundEmailHandler{
         MapFlow.put('Envelope_ToAddress', Envelope_ToAddress);
         System.debug('Input to Flow var Envelope_ToAddress: '+ Envelope_ToAddress);
         MapFlow.put('Email_ToAddresses', Email_ToAddresses);
-        System.debug('IInput to Flow var Email_ToAddresses: '+ Email_ToAddresses);
+        System.debug('Input to Flow var Email_ToAddresses: '+ Email_ToAddresses);
         MapFlow.put('Email_FromName', Email_FromName);
         System.debug('Input to Flow var Email_FromName: '+ Email_FromName);
         MapFlow.put('Email_FromAddress', Email_FromAddress);
