@@ -2,10 +2,26 @@
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>50.0</apiVersion>
     <assignments>
+        <name>Assign_API_User_as_Owner</name>
+        <label>Assign API User as Owner</label>
+        <locationX>578</locationX>
+        <locationY>458</locationY>
+        <assignmentItems>
+            <assignToReference>vt_TaskOwner</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>$User.Id</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Create_Task</targetReference>
+        </connector>
+    </assignments>
+    <assignments>
         <name>Assign_Test_AutoReply</name>
         <label>Assign Test AutoReply</label>
-        <locationX>487</locationX>
-        <locationY>15</locationY>
+        <locationX>50</locationX>
+        <locationY>350</locationY>
         <assignmentItems>
             <assignToReference>AutoReplyMessage</assignToReference>
             <operator>Assign</operator>
@@ -14,28 +30,87 @@
             </value>
         </assignmentItems>
     </assignments>
+    <assignments>
+        <name>Assign_User_as_Owner</name>
+        <label>Assign User as Owner</label>
+        <locationX>314</locationX>
+        <locationY>458</locationY>
+        <assignmentItems>
+            <assignToReference>vt_TaskOwner</assignToReference>
+            <operator>Assign</operator>
+            <value>
+                <elementReference>Get_User.Id</elementReference>
+            </value>
+        </assignmentItems>
+        <connector>
+            <targetReference>Create_Task</targetReference>
+        </connector>
+    </assignments>
     <decisions>
-        <name>Router</name>
-        <label>Router</label>
-        <locationX>481</locationX>
-        <locationY>383</locationY>
+        <description>Not an actively used process, leaving it here because this is what would be needed if we want to associate attachments later on -</description>
+        <name>HasAttachment_dec</name>
+        <label>Has Attachment?</label>
+        <locationX>248</locationX>
+        <locationY>134</locationY>
+        <defaultConnector>
+            <targetReference>Get_User</targetReference>
+        </defaultConnector>
         <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
         <rules>
-            <name>Test</name>
+            <name>Not_Used</name>
             <conditionLogic>and</conditionLogic>
             <conditions>
                 <leftValueReference>Email_Subject</leftValueReference>
-                <operator>EqualTo</operator>
+                <operator>IsNull</operator>
                 <rightValue>
-                    <stringValue>Test Email To Flow</stringValue>
+                    <booleanValue>true</booleanValue>
                 </rightValue>
             </conditions>
             <connector>
                 <targetReference>Create_ContentVersion</targetReference>
             </connector>
-            <label>Test</label>
+            <label>Not Used</label>
         </rules>
     </decisions>
+    <decisions>
+        <description>If there is a user with an email that matches the from address, then that person will be who the task is assigned to.</description>
+        <name>User_Match</name>
+        <label>User Match?</label>
+        <locationX>446</locationX>
+        <locationY>350</locationY>
+        <defaultConnector>
+            <targetReference>Assign_API_User_as_Owner</targetReference>
+        </defaultConnector>
+        <defaultConnectorLabel>Default Outcome</defaultConnectorLabel>
+        <rules>
+            <name>Found_User</name>
+            <conditionLogic>and</conditionLogic>
+            <conditions>
+                <leftValueReference>Get_User</leftValueReference>
+                <operator>IsNull</operator>
+                <rightValue>
+                    <booleanValue>false</booleanValue>
+                </rightValue>
+            </conditions>
+            <connector>
+                <targetReference>Assign_User_as_Owner</targetReference>
+            </connector>
+            <label>Found User</label>
+        </rules>
+    </decisions>
+    <description>LEAVE AT TOP - Has Attachment Dec isn&apos;t necessary but has been left in case we want to add something in the future.
+2024-08-14 NG Created this flow for Landoption CRM customers to be able to send in emails as tasks on their account.</description>
+    <environments>Default</environments>
+    <formulas>
+        <name>Data</name>
+        <dataType>String</dataType>
+        <expression>&quot;Email_InReplyTo: &quot; &amp; {!Email_InReplyTo} &amp; BR() &amp;
+&quot;Email_MessageId: &quot; &amp;{!Email_MessageId}   &amp; BR() &amp;
+&quot;Email_ReplyTo: &quot; &amp; {!Email_ReplyTo}  &amp; BR() &amp;
+&quot;Env_From: &quot; &amp; {!Email_FromAddress}  &amp; BR() &amp;
+&quot;Env_To: &quot; &amp; {!Envelope_ToAddress} &amp; BR() &amp;
+&quot;AutoReply: &quot; &amp;  {!AutoReplyMessage}</expression>
+    </formulas>
     <interviewLabel>EmailToFlowController {!$Flow.CurrentDateTime}</interviewLabel>
     <label>EmailToFlowController</label>
     <processMetadataValues>
@@ -47,7 +122,7 @@
     <processMetadataValues>
         <name>CanvasMode</name>
         <value>
-            <stringValue>FREE_FORM_CANVAS</stringValue>
+            <stringValue>AUTO_LAYOUT_CANVAS</stringValue>
         </value>
     </processMetadataValues>
     <processMetadataValues>
@@ -60,21 +135,104 @@
     <recordCreates>
         <name>Create_ContentVersion</name>
         <label>Create ContentVersion</label>
-        <locationX>489</locationX>
-        <locationY>168</locationY>
+        <locationX>50</locationX>
+        <locationY>242</locationY>
         <connector>
             <targetReference>Assign_Test_AutoReply</targetReference>
         </connector>
         <inputReference>Email_ContentVersion</inputReference>
     </recordCreates>
-    <start>
-        <locationX>50</locationX>
-        <locationY>363</locationY>
+    <recordCreates>
+        <name>Create_Task</name>
+        <label>Create Task</label>
+        <locationX>446</locationX>
+        <locationY>650</locationY>
+        <inputAssignments>
+            <field>ActivityDate</field>
+            <value>
+                <elementReference>$Flow.CurrentDate</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Description</field>
+            <value>
+                <elementReference>Email_TextBody</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>OwnerId</field>
+            <value>
+                <elementReference>vt_TaskOwner</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Status</field>
+            <value>
+                <stringValue>Completed</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Subject</field>
+            <value>
+                <elementReference>Email_Subject</elementReference>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>TaskSubtype</field>
+            <value>
+                <stringValue>Email</stringValue>
+            </value>
+        </inputAssignments>
+        <inputAssignments>
+            <field>Type</field>
+            <value>
+                <stringValue>Task</stringValue>
+            </value>
+        </inputAssignments>
+        <object>Task</object>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordCreates>
+    <recordLookups>
+        <description>gets the user with the matching email address</description>
+        <name>Get_User</name>
+        <label>Get User</label>
+        <locationX>446</locationX>
+        <locationY>242</locationY>
+        <assignNullValuesIfNoRecordsFound>false</assignNullValuesIfNoRecordsFound>
         <connector>
-            <targetReference>Router</targetReference>
+            <targetReference>User_Match</targetReference>
+        </connector>
+        <filterLogic>and</filterLogic>
+        <filters>
+            <field>Email</field>
+            <operator>EqualTo</operator>
+            <value>
+                <elementReference>Email_FromAddress</elementReference>
+            </value>
+        </filters>
+        <filters>
+            <field>IsActive</field>
+            <operator>EqualTo</operator>
+            <value>
+                <booleanValue>true</booleanValue>
+            </value>
+        </filters>
+        <getFirstRecordOnly>true</getFirstRecordOnly>
+        <object>User</object>
+        <queriedFields>Id</queriedFields>
+        <queriedFields>Email</queriedFields>
+        <sortField>LastLoginDate</sortField>
+        <sortOrder>Desc</sortOrder>
+        <storeOutputAutomatically>true</storeOutputAutomatically>
+    </recordLookups>
+    <start>
+        <locationX>122</locationX>
+        <locationY>0</locationY>
+        <connector>
+            <targetReference>HasAttachment_dec</targetReference>
         </connector>
     </start>
-    <status>Draft</status>
+    <status>Active</status>
     <variables>
         <name>AutoReplyMessage</name>
         <dataType>String</dataType>
@@ -193,6 +351,13 @@
         <dataType>String</dataType>
         <isCollection>false</isCollection>
         <isInput>true</isInput>
+        <isOutput>false</isOutput>
+    </variables>
+    <variables>
+        <name>vt_TaskOwner</name>
+        <dataType>String</dataType>
+        <isCollection>false</isCollection>
+        <isInput>false</isInput>
         <isOutput>false</isOutput>
     </variables>
 </Flow>
