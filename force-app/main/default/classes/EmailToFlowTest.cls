@@ -18,6 +18,7 @@ public class EmailToFlowTest {
         email.references = new List<string>{''};
         email.htmlBody = 'Hello, <br/> World';
         email.plainTextBody = 'Hello, World';
+        email.messageId = 'ABCDEFGHIJKL=5s03sP262OV+YG+pxA@mail.example.com';
         
         Test.startTest();
         
@@ -40,7 +41,8 @@ public class EmailToFlowTest {
         email.textAttachments =   new Messaging.inboundEmail.TextAttachment[] { attachmenttext };
         
         //retest with Attachments
-        EmailToFlowObj.handleInboundEmail(email, env);
+        Messaging.InboundEmailResult EmailToFlowResult = EmailToFlowObj.handleInboundEmail(email, env);
+        system.assertEquals(True, EmailToFlowResult.success);
         Test.stopTest();
     }
 
