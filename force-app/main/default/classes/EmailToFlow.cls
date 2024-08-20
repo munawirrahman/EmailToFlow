@@ -1,13 +1,13 @@
 /* @author: Munawir
  * @authorEmail: munawirrahman@gmail.com
- * @authorMedium: https://medium.com/@munawirrahman
+ * @Full Documentation: https://munawirrahman.medium.com/email-to-flow-in-salesforce-ba8e300f9672
  * @Description: Email Service Router to Salesforce Flow Builder
  */
 
 global class EmailToFlow implements Messaging.inboundEmailHandler{
  
     global Messaging.InboundEmailResult handleInboundEmail(Messaging.InboundEmail email, Messaging.InboundEnvelope env) {
-        Messaging.InboundEmailResult AutoReply = new Messaging.InboundEmailResult();
+        Messaging.InboundEmailResult result = new Messaging.InboundEmailResult();
         
         //Assigning values from email and envelope to variable make it easier to read
         String Envelope_FromAddress = env.FromAddress;
@@ -30,57 +30,91 @@ global class EmailToFlow implements Messaging.inboundEmailHandler{
         Map<String, Object> MapFlow = new Map<String, Object>();
         MapFlow.put('Envelope_FromAddress', Envelope_FromAddress);
         System.debug('Input to Flow var Envelope_FromAddress: '+ Envelope_FromAddress);
+        
         MapFlow.put('Envelope_ToAddress', Envelope_ToAddress);
         System.debug('Input to Flow var Envelope_ToAddress: '+ Envelope_ToAddress);
+        
         MapFlow.put('Email_ToAddresses', Email_ToAddresses);
         System.debug('Input to Flow var Email_ToAddresses: '+ Email_ToAddresses);
+        
         MapFlow.put('Email_FromName', Email_FromName);
         System.debug('Input to Flow var Email_FromName: '+ Email_FromName);
+        
         MapFlow.put('Email_FromAddress', Email_FromAddress);
         System.debug('Input to Flow var Email_FromAddress: '+ Email_FromAddress);
+        
         MapFlow.put('Email_CCAddresses', Email_CCAddresses);
         System.debug('Input to Flow var Email_CCAddresses: '+ Email_CCAddresses);
+        
         MapFlow.put('Email_Subject', Email_Subject);
         System.debug('Input to Flow var Email_Subject: '+ Email_Subject);
+        
         MapFlow.put('Email_ReplyTo', Email_ReplyTo);
         System.debug('Input to Flow var Email_ReplyTo: '+ Email_ReplyTo);
+        
         MapFlow.put('Email_MessageId', Email_MessageId);
         System.debug('Input to Flow var Email_MessageId: '+ Email_MessageId);
+        
         MapFlow.put('Email_References', Email_References);
         System.debug('Input to Flow var Email_References: '+ Email_References);
+        
         MapFlow.put('Email_HTMLBody', Email_HTMLBody);
         System.debug('Input to Flow var Email_HTMLBody: '+ Email_HTMLBody);
+        
         MapFlow.put('Email_IsHTMLTruncated', Email_IsHTMLTruncated);
         System.debug('Input to Flow var Email_IsHTMLTruncated: '+ Email_IsHTMLTruncated);
+        
         MapFlow.put('Email_TextBody', Email_TextBody);
         System.debug('Input to Flow var Email_TextBody: '+ Email_TextBody);
+        
         MapFlow.put('Email_IsTextBodyTruncated', Email_IsTextBodyTruncated);
         System.debug('Input to Flow var Email_IsTextBodyTruncated: '+ Email_IsTextBodyTruncated);
+        
         MapFlow.put('Email_ContentVersion',Email_ContentVersion);
         System.debug('Input to Flow var Email_ContentVersion: '+ Email_ContentVersion);
-        System.debug(MapFlow);
         
         System.debug('Running flow...');
         
         //EmailToFlowController = autolaunched flow api name
         Flow.Interview.EmailToFlowController myFlow = new Flow.Interview.EmailToFlowController(MapFlow);
-		myFlow.start();
+        myFlow.start();
         System.debug('Flow finished.');
-        //AutoReply Email to Sender but AutoReply_Message should be assigned in flow
+        
+        //AutoReply Email to Sender but AutoReplyMessage should be assigned in flow
         if(myFlow.AutoReplyMessage != Null){
-            System.debug('myFlow AutoReply Message: '+ myFlow.AutoReplyMessage);
-            AutoReply.message = myFlow.AutoReplyMessage;
+            Messaging.SingleEmailMessage AutoReply = new Messaging.SingleEmailMessage();
+            List<String> AutoReplyToAddresses = new List<String>{Email_fromAddress};
+            AutoReply.setToAddresses(AutoReplyToAddresses);
+            AutoReply.setCcAddresses(Email_CCAddresses);
+            AutoReply.setInReplyTo(Email_messageId);
+            AutoReply.setSubject(Email_Subject);
+            AutoReply.setHtmlBody(myFlow.AutoReplyMessage);
+            Messaging.SingleEmailMessage[] AutoReplyMessages = new List<Messaging.SingleEmailMessage> {AutoReply};
+            IF (checkEmailDeliverability()) {
+                Messaging.sendEmail(AutoReplyMessages);
+            }
         }
-        return AutoReply;
+        return result;
+    }
+    
+    private boolean checkEmailDeliverability(){
+        Boolean EmailDeliverabilityEnabled = true;
+        try {
+            Messaging.reserveSingleEmailCapacity(1);
+            Messaging.reserveMassEmailCapacity(1);
+        } catch (System.NoAccessException e) {
+            EmailDeliverabilityEnabled = false;
+        }
+        return EmailDeliverabilityEnabled;
     }
     
     //Convert All Attachments to List of ContentVersion
     private static List<ContentVersion>ConvertAttachmentsToCV(Messaging.InboundEmail email){
-        ContentVersion CVRecord = new ContentVersion();
         List<ContentVersion>CVRecords = new List<ContentVersion>();
         //Convert binary attachments to ContentVersion
         if (email.BinaryAttachments != null && !email.BinaryAttachments.isEmpty()){
             for (Messaging.InboundEmail.BinaryAttachment BinAttach : email.BinaryAttachments){
+                ContentVersion CVRecord = new ContentVersion();
                 CVRecord.Title = BinAttach.FileName;
                 CVRecord.VersionData = BinAttach.Body;
                 CVRecord.PathOnClient = '/' + BinAttach.FileName ;
@@ -90,6 +124,7 @@ global class EmailToFlow implements Messaging.inboundEmailHandler{
         //Convert text attachments to PDF ContentVersion
         if (email.TextAttachments != null && !email.TextAttachments.isEmpty()){
             for (Messaging.InboundEmail.TextAttachment TextAttach : email.TextAttachments){
+                ContentVersion CVRecord = new ContentVersion();
                 CVRecord.Title = TextAttach.FileName;
                 CVRecord.VersionData = Blob.ToPDF(TextAttach.Body);
                 CVRecord.PathOnClient = '/' + TextAttach.FileName.Replace('.','') + '.pdf' ;
